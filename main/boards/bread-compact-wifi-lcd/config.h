@@ -4,11 +4,14 @@
 #include <driver/gpio.h>
 
 #define AUDIO_INPUT_SAMPLE_RATE  16000
+
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+
 #define AUDIO_OUTPUT_SAMPLE_RATE 24000
 
 // 如果使用 Duplex I2S 模式，请注释下面一行
 #define AUDIO_I2S_METHOD_SIMPLEX
-
+//ESP32S3
 #ifdef AUDIO_I2S_METHOD_SIMPLEX
 
 #define AUDIO_I2S_MIC_GPIO_WS   GPIO_NUM_4
@@ -27,25 +30,70 @@
 
 #endif
 
-
 #define BUILTIN_LED_GPIO        GPIO_NUM_48
 #define BOOT_BUTTON_GPIO        GPIO_NUM_0
 #define TOUCH_BUTTON_GPIO       GPIO_NUM_NC 
 #define VOLUME_UP_BUTTON_GPIO   GPIO_NUM_NC 
 #define VOLUME_DOWN_BUTTON_GPIO GPIO_NUM_NC 
 
+// ESP32C6 has only 1 I2S and only duplex mode is supported.
+// Duplex mode reference : https://ccnphfhqs21z.feishu.cn/wiki/EH6wwrgvNiU7aykr7HgclP09nCh
+
+#define AUDIO_OUTPUT_SAMPLE_RATE  AUDIO_INPUT_SAMPLE_RATE
+
+#define AUDIO_I2S_GPIO_WS   GPIO_NUM_4       // WS for MIC, LRC for SPK
+#define AUDIO_I2S_GPIO_BCLK GPIO_NUM_5       // SCK for MIC, BCLK for SPK
+#define AUDIO_I2S_GPIO_DIN  GPIO_NUM_6       // SD for MIC
+#define AUDIO_I2S_GPIO_DOUT GPIO_NUM_7       // DIN for SPK
+
+#define DISPLAY_MOSI_PIN      GPIO_NUM_41
+#define DISPLAY_CLK_PIN       GPIO_NUM_42
+
 #ifdef CONFIG_LCD_GC9A01_240X240
+#define DISPLAY_DC_PIN        GPIO_NUM_47
+#define DISPLAY_CS_PIN        GPIO_NUM_45
+#define DISPLAY_RST_PIN       GPIO_NUM_38
 #define DISPLAY_BACKLIGHT_PIN GPIO_NUM_NC
 #else
-#define DISPLAY_BACKLIGHT_PIN GPIO_NUM_38 //GPIO_NUM_42 -> GPIO_NUM_38
+#define DISPLAY_RST_PIN       GPIO_NUM_47
+#define DISPLAY_DC_PIN        GPIO_NUM_45
+#define DISPLAY_CS_PIN        GPIO_NUM_38
+#define DISPLAY_BACKLIGHT_PIN GPIO_NUM_40
 #endif
 
-#define DISPLAY_MOSI_PIN      GPIO_NUM_41 //GPIO_NUM_47 -> GPIO_NUM_41
-#define DISPLAY_CLK_PIN       GPIO_NUM_42 //GPIO_NUM_21 -> GPIO_NUM_42
-#define DISPLAY_DC_PIN        GPIO_NUM_39 //GPIO_NUM_40 -> GPIO_NUM_39
-#define DISPLAY_RST_PIN       GPIO_NUM_40 //GPIO_NUM_45 -> GPIO_NUM_40
-#define DISPLAY_CS_PIN        GPIO_NUM_47 //GPIO_NUM_41 -> GPIO_NUM_47
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+//ESP32C6
+#define BUILTIN_LED_GPIO        GPIO_NUM_8
+#define BOOT_BUTTON_GPIO        GPIO_NUM_9
+#define TOUCH_BUTTON_GPIO       GPIO_NUM_2 
 
+// ESP32C6 has only 1 I2S and only duplex mode is supported.
+// Duplex mode reference : https://ccnphfhqs21z.feishu.cn/wiki/EH6wwrgvNiU7aykr7HgclP09nCh
+
+#define AUDIO_OUTPUT_SAMPLE_RATE  AUDIO_INPUT_SAMPLE_RATE
+
+#define AUDIO_I2S_GPIO_WS   GPIO_NUM_4       // WS for MIC, LRC for SPK
+#define AUDIO_I2S_GPIO_BCLK GPIO_NUM_5       // SCK for MIC, BCLK for SPK
+#define AUDIO_I2S_GPIO_DIN  GPIO_NUM_6       // SD for MIC
+#define AUDIO_I2S_GPIO_DOUT GPIO_NUM_7       // DIN for SPK
+
+#ifdef CONFIG_LCD_GC9A01_240X240
+#define DISPLAY_DC_PIN        GPIO_NUM_23
+#define DISPLAY_CS_PIN        GPIO_NUM_22
+#define DISPLAY_RST_PIN       GPIO_NUM_21 
+#define DISPLAY_BACKLIGHT_PIN GPIO_NUM_NC
+#else
+#define DISPLAY_RST_PIN       GPIO_NUM_23 
+#define DISPLAY_DC_PIN        GPIO_NUM_22
+#define DISPLAY_CS_PIN        GPIO_NUM_21
+#define DISPLAY_BACKLIGHT_PIN GPIO_NUM_20 
+#endif
+
+#define DISPLAY_MOSI_PIN      GPIO_NUM_11 
+#define DISPLAY_CLK_PIN       GPIO_NUM_10 
+#else
+#error "不支持 ESP32C6 以及 ESP32S3 以外的平台"
+#endif
 
 #ifdef CONFIG_LCD_ST7789_240X320
 #define LCD_TYPE_ST7789_SERIAL
@@ -261,8 +309,8 @@
 #define LCD_TYPE_GC9A01_SERIAL
 #define DISPLAY_WIDTH   240
 #define DISPLAY_HEIGHT  240
-#define DISPLAY_MIRROR_X true
-#define DISPLAY_MIRROR_Y false
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y true
 #define DISPLAY_SWAP_XY false
 #define DISPLAY_INVERT_COLOR    true
 #define DISPLAY_RGB_ORDER  LCD_RGB_ELEMENT_ORDER_BGR
