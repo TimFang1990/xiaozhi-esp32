@@ -36,16 +36,6 @@
 #define VOLUME_UP_BUTTON_GPIO   GPIO_NUM_NC 
 #define VOLUME_DOWN_BUTTON_GPIO GPIO_NUM_NC 
 
-// ESP32C6 has only 1 I2S and only duplex mode is supported.
-// Duplex mode reference : https://ccnphfhqs21z.feishu.cn/wiki/EH6wwrgvNiU7aykr7HgclP09nCh
-
-#define AUDIO_OUTPUT_SAMPLE_RATE  AUDIO_INPUT_SAMPLE_RATE
-
-#define AUDIO_I2S_GPIO_WS   GPIO_NUM_4       // WS for MIC, LRC for SPK
-#define AUDIO_I2S_GPIO_BCLK GPIO_NUM_5       // SCK for MIC, BCLK for SPK
-#define AUDIO_I2S_GPIO_DIN  GPIO_NUM_6       // SD for MIC
-#define AUDIO_I2S_GPIO_DOUT GPIO_NUM_7       // DIN for SPK
-
 #define DISPLAY_MOSI_PIN      GPIO_NUM_41
 #define DISPLAY_CLK_PIN       GPIO_NUM_42
 
