@@ -25,7 +25,9 @@
 - Wi-Fi / ML307 Cat.1 4G
 - BOOT 键唤醒和打断，支持点击和长按两种触发方式
 - 离线语音唤醒 [ESP-SR](https://github.com/espressif/esp-sr)
+  - 已支持ESP32C6离线语音唤醒 (2025.5.25)
 - 流式语音对话（WebSocket 或 UDP 协议）
+- 实时打断功能（支持AFE的情况下效果最佳，如ESP32, ESP32S3, ESP32P4）
 - 支持国语、粤语、英语、日语、韩语 5 种语言识别 [SenseVoice](https://github.com/FunAudioLLM/SenseVoice)
 - 声纹识别，识别是谁在喊 AI 的名字 [3D Speaker](https://github.com/modelscope/3D-Speaker)
 - 大模型 TTS（火山引擎 或 CosyVoice）
