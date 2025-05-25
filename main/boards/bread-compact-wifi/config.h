@@ -6,6 +6,7 @@
 #define AUDIO_INPUT_SAMPLE_RATE  16000
 
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
+//Platform: ESP32S3
 #define AUDIO_OUTPUT_SAMPLE_RATE 24000
 
 // 如果使用 Duplex I2S 模式，请注释下面一行
@@ -38,6 +39,7 @@
 
 #define DISPLAY_SDA_PIN GPIO_NUM_41
 #define DISPLAY_SCL_PIN GPIO_NUM_42
+
 #elif defined(CONFIG_IDF_TARGET_ESP32C6)
 //Platform: ESP32C6
 #define AUDIO_OUTPUT_SAMPLE_RATE AUDIO_INPUT_SAMPLE_RATE
@@ -55,6 +57,7 @@
 
 #define DISPLAY_SDA_PIN GPIO_NUM_10 
 #define DISPLAY_SCL_PIN GPIO_NUM_11 
+
 #else
 #error "不支持 ESP32C6 以及 ESP32S3 以外的平台"
 #endif

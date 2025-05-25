@@ -66,6 +66,7 @@ class CompactWifiBoardLCD : public WifiBoard {
 private:
  
     Button boot_button_;
+    Button touch_button_;
     LcdDisplay* display_;
 
     void InitializeSpi() {
@@ -76,7 +77,7 @@ private:
         buscfg.quadwp_io_num = GPIO_NUM_NC;
         buscfg.quadhd_io_num = GPIO_NUM_NC;
         buscfg.max_transfer_sz = DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(uint16_t);
-        ESP_ERROR_CHECK(spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO));
+        ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO));
     }
 
     void InitializeLcdDisplay() {
@@ -92,7 +93,7 @@ private:
         io_config.trans_queue_depth = 10;
         io_config.lcd_cmd_bits = 8;
         io_config.lcd_param_bits = 8;
-        ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(SPI3_HOST, &io_config, &panel_io));
+        ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(SPI2_HOST, &io_config, &panel_io));
 
         // 初始化液晶屏驱动芯片
         ESP_LOGD(TAG, "Install LCD driver");
@@ -145,6 +146,12 @@ private:
             }
             app.ToggleChatState();
         });
+        touch_button_.OnPressDown([this]() {
+            Application::GetInstance().StartListening();
+        });
+        touch_button_.OnPressUp([this]() {
+            Application::GetInstance().StopListening();
+        });
     }
 
     // 物联网初始化，添加对 AI 可见设备
@@ -157,7 +164,8 @@ private:
 
 public:
     CompactWifiBoardLCD() :
-        boot_button_(BOOT_BUTTON_GPIO) {
+        boot_button_(BOOT_BUTTON_GPIO),
+        touch_button_(TOUCH_BUTTON_GPIO) {
         InitializeSpi();
         InitializeLcdDisplay();
         InitializeButtons();
