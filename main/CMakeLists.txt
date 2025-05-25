@@ -10,8 +10,11 @@ set(SOURCES "audio_codecs/audio_codec.cc"
             "display/lcd_display.cc"
             "display/oled_display.cc"
             "protocols/protocol.cc"
+            "protocols/mqtt_protocol.cc"
+            "protocols/websocket_protocol.cc"
             "iot/thing.cc"
             "iot/thing_manager.cc"
+            "mcp_server.cc"
             "system_info.cc"
             "application.cc"
             "ota.cc"
@@ -34,14 +37,12 @@ list(APPEND INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/boards/common)
 # 根据 BOARD_TYPE 配置添加对应的板级文件
 if(CONFIG_BOARD_TYPE_BREAD_COMPACT_WIFI)
     set(BOARD_TYPE "bread-compact-wifi")
-elseif(CONFIG_BOARD_TYPE_BREAD_COMPACT_WIFI_ESP32C6)
-    set(BOARD_TYPE "bread-compact-wifi-esp32c6")
 elseif(CONFIG_BOARD_TYPE_BREAD_COMPACT_ML307)
     set(BOARD_TYPE "bread-compact-ml307")
 elseif(CONFIG_BOARD_TYPE_BREAD_COMPACT_ESP32)
     set(BOARD_TYPE "bread-compact-esp32")
 elseif(CONFIG_BOARD_TYPE_BREAD_COMPACT_ESP32_LCD)
-    set(BOARD_TYPE "bread-compact-esp32-lcd")    
+    set(BOARD_TYPE "bread-compact-esp32-lcd")
 elseif(CONFIG_BOARD_TYPE_DF_K10)
     set(BOARD_TYPE "df-k10")
 elseif(CONFIG_BOARD_TYPE_ESP_BOX_3)
@@ -75,7 +76,7 @@ elseif(CONFIG_BOARD_TYPE_MAGICLICK_C3)
 elseif(CONFIG_BOARD_TYPE_MAGICLICK_C3_V2)
     set(BOARD_TYPE "magiclick-c3-v2")
 elseif(CONFIG_BOARD_TYPE_M5STACK_CORE_S3)
-    set(BOARD_TYPE "m5stack-core-s3")
+    set(BOARD_TYPE "m5stack-core-s3")	
 elseif(CONFIG_BOARD_TYPE_ATOMS3_ECHO_BASE)
     set(BOARD_TYPE "atoms3-echo-base")
 elseif(CONFIG_BOARD_TYPE_ATOMS3R_ECHO_BASE)
@@ -141,15 +142,12 @@ file(GLOB BOARD_SOURCES
 )
 list(APPEND SOURCES ${BOARD_SOURCES})
 
-if(CONFIG_CONNECTION_TYPE_MQTT_UDP)
-    list(APPEND SOURCES "protocols/mqtt_protocol.cc")
-elseif(CONFIG_CONNECTION_TYPE_WEBSOCKET)
-    list(APPEND SOURCES "protocols/websocket_protocol.cc")
-endif()
-
 if(CONFIG_USE_AUDIO_PROCESSOR)
-    list(APPEND SOURCES "audio_processing/audio_processor.cc")
-endif()
+    list(APPEND SOURCES "audio_processing/afe_audio_processor.cc")
+else()
+    list(APPEND SOURCES "audio_processing/dummy_audio_processor.cc")
+endif()    
+
 if(CONFIG_USE_WAKE_WORD_DETECT)
     list(APPEND SOURCES "audio_processing/wake_word_detect.cc")
 endif()

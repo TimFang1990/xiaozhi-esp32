@@ -7,6 +7,7 @@
 #include <sstream>
 
 #define DETECTION_RUNNING_EVENT 1
+#define WAKE_NET_TO_PROCESS_VALID_DATA 2
 
 static const char* TAG = "WakeWordDetect";
 
@@ -22,18 +23,27 @@ WakeWordDetect::~WakeWordDetect() {
     if (afe_data_ != nullptr) {
         afe_iface_->destroy(afe_data_);
     }
-
+    
+#if CONFIG_USE_WAKENET_DIRECT_IF
+    ESP_LOGI(TAG, "Start to free data_to_det_ ... ");
+    if(data_to_det_ != nullptr){
+        free(data_to_det_);
+        data_to_det_ = nullptr;
+    }
+    ESP_LOGI(TAG, "Free data_to_det_ done. ");
+#else
     if (wake_word_encode_task_stack_ != nullptr) {
         heap_caps_free(wake_word_encode_task_stack_);
     }
+#endif
 
+    vTaskDelete(audio_detection_task_);
     vEventGroupDelete(event_group_);
 }
 
-void WakeWordDetect::Initialize(int channels, bool reference) {
-    channels_ = channels;
-    reference_ = reference;
-    int ref_num = reference_ ? 1 : 0;
+void WakeWordDetect::Initialize(AudioCodec* codec) {
+    codec_ = codec;
+    int ref_num = codec_->input_reference() ? 1 : 0;
 
     srmodel_list_t *models = esp_srmodel_init("model");
     for (int i = 0; i < models->num; i++) {
@@ -49,16 +59,20 @@ void WakeWordDetect::Initialize(int channels, bool reference) {
             }
         }
     }
-
+#if CONFIG_USE_WAKENET_DIRECT_IF
+    //Only one model is supported
+    afe_iface_ = (esp_wn_iface_t*)esp_wn_handle_from_name(models->model_name[models->num-1]);
+    afe_data_ = afe_iface_->create(models->model_name[models->num-1], DET_MODE_95);
+#else
     std::string input_format;
-    for (int i = 0; i < channels_ - ref_num; i++) {
+    for (int i = 0; i < codec_->input_channels() - ref_num; i++) {
         input_format.push_back('M');
     }
     for (int i = 0; i < ref_num; i++) {
         input_format.push_back('R');
     }
     afe_config_t* afe_config = afe_config_init(input_format.c_str(), models, AFE_TYPE_SR, AFE_MODE_HIGH_PERF);
-    afe_config->aec_init = reference_;
+    afe_config->aec_init = codec_->input_reference();
     afe_config->aec_mode = AEC_MODE_SR_HIGH_PERF;
     afe_config->afe_perferred_core = 1;
     afe_config->afe_perferred_priority = 1;
@@ -66,12 +80,13 @@ void WakeWordDetect::Initialize(int channels, bool reference) {
     
     afe_iface_ = esp_afe_handle_from_config(afe_config);
     afe_data_ = afe_iface_->create_from_config(afe_config);
+#endif
 
     xTaskCreate([](void* arg) {
         auto this_ = (WakeWordDetect*)arg;
         this_->AudioDetectionTask();
         vTaskDelete(NULL);
-    }, "audio_detection", 4096, this, 3, nullptr);
+    }, "audio_detection", 4096, this, 3, &audio_detection_task_);
 }
 
 void WakeWordDetect::OnWakeWordDetected(std::function<void(const std::string& wake_word)> callback) {
@@ -84,7 +99,11 @@ void WakeWordDetect::StartDetection() {
 
 void WakeWordDetect::StopDetection() {
     xEventGroupClearBits(event_group_, DETECTION_RUNNING_EVENT);
-    afe_iface_->reset_buffer(afe_data_);
+#ifndef CONFIG_USE_WAKENET_DIRECT_IF    
+    if (afe_data_ != nullptr) {
+        afe_iface_->reset_buffer(afe_data_);
+    }
+#endif    
 }
 
 bool WakeWordDetect::IsDetectionRunning() {
@@ -92,22 +111,55 @@ bool WakeWordDetect::IsDetectionRunning() {
 }
 
 void WakeWordDetect::Feed(const std::vector<int16_t>& data) {
-    input_buffer_.insert(input_buffer_.end(), data.begin(), data.end());
-
-    auto feed_size = afe_iface_->get_feed_chunksize(afe_data_) * channels_;
-    while (input_buffer_.size() >= feed_size) {
-        afe_iface_->feed(afe_data_, input_buffer_.data());
-        input_buffer_.erase(input_buffer_.begin(), input_buffer_.begin() + feed_size);
+    if (afe_data_ == nullptr) {
+        return;
     }
+#ifdef CONFIG_USE_WAKENET_DIRECT_IF
+    if(!data_to_det_){
+        data_to_det_ = (int16_t *) malloc(data.size()*sizeof(int16_t));
+    }
+    memcpy(data_to_det_, data.data(), data.size()*sizeof(int16_t));
+    xEventGroupSetBits(event_group_, WAKE_NET_TO_PROCESS_VALID_DATA);
+#else    
+    afe_iface_->feed(afe_data_, data.data());
+#endif    
+}
+
+size_t WakeWordDetect::GetFeedSize() {
+    if (afe_data_ == nullptr) {
+        return 0;
+    }
+#if CONFIG_USE_WAKENET_DIRECT_IF
+    return afe_iface_->get_samp_chunksize(afe_data_) * codec_->input_channels();
+#else
+    return afe_iface_->get_feed_chunksize(afe_data_) * codec_->input_channels();
+#endif
 }
 
 void WakeWordDetect::AudioDetectionTask() {
+#if CONFIG_USE_WAKENET_DIRECT_IF
+    ESP_LOGI(TAG, "Audio detection task started, feed size per channel: %d, audio channels: %d",
+        afe_iface_->get_samp_chunksize(afe_data_) * sizeof(int16_t), 
+        codec_->input_channels());
+#else
     auto fetch_size = afe_iface_->get_fetch_chunksize(afe_data_);
     auto feed_size = afe_iface_->get_feed_chunksize(afe_data_);
     ESP_LOGI(TAG, "Audio detection task started, feed size: %d fetch size: %d",
         feed_size, fetch_size);
+#endif
 
     while (true) {
+    #if CONFIG_USE_WAKENET_DIRECT_IF
+        xEventGroupWaitBits(event_group_, WAKE_NET_TO_PROCESS_VALID_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
+        wakenet_state_t state = afe_iface_->detect(afe_data_, data_to_det_);
+        if(state == WAKENET_DETECTED){
+            StopDetection();
+            if (wake_word_detected_callback_) {
+                wake_word_detected_callback_(wake_words_[wake_words_.size()-1]);
+            }
+        } 
+        xEventGroupClearBits(event_group_, WAKE_NET_TO_PROCESS_VALID_DATA);
+    #else
         xEventGroupWaitBits(event_group_, DETECTION_RUNNING_EVENT, pdFALSE, pdTRUE, portMAX_DELAY);
 
         auto res = afe_iface_->fetch_with_delay(afe_data_, portMAX_DELAY);
@@ -126,6 +178,7 @@ void WakeWordDetect::AudioDetectionTask() {
                 wake_word_detected_callback_(last_detected_wake_word_);
             }
         }
+    #endif
     }
 }
 
@@ -140,10 +193,14 @@ void WakeWordDetect::StoreWakeWordData(uint16_t* data, size_t samples) {
 
 void WakeWordDetect::EncodeWakeWordData() {
     wake_word_opus_.clear();
+#ifdef CONFIG_USE_WAKENET_DIRECT_IF
+    xTaskCreate([](void* arg) {
+#else
     if (wake_word_encode_task_stack_ == nullptr) {
         wake_word_encode_task_stack_ = (StackType_t*)heap_caps_malloc(4096 * 8, MALLOC_CAP_SPIRAM);
     }
     wake_word_encode_task_ = xTaskCreateStatic([](void* arg) {
+#endif
         auto this_ = (WakeWordDetect*)arg;
         {
             auto start_time = esp_timer_get_time();
@@ -168,7 +225,12 @@ void WakeWordDetect::EncodeWakeWordData() {
             this_->wake_word_cv_.notify_all();
         }
         vTaskDelete(NULL);
+#ifdef CONFIG_USE_WAKENET_DIRECT_IF     
+    }, "encode_detect_packets", 4096 * 2, this, 8, &wake_word_encode_task_);
+#else
     }, "encode_detect_packets", 4096 * 8, this, 2, wake_word_encode_task_stack_, &wake_word_encode_task_buffer_);
+#endif    
+    
 }
 
 bool WakeWordDetect::GetWakeWordOpus(std::vector<uint8_t>& opus) {

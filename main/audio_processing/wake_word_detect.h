@@ -5,8 +5,13 @@
 #include <freertos/task.h>
 #include <freertos/event_groups.h>
 
+#if CONFIG_USE_WAKENET_DIRECT_IF
+#include <esp_wn_iface.h>
+#include <esp_wn_models.h>
+#else
 #include <esp_afe_sr_models.h>
 #include <esp_nsn_models.h>
+#endif
 
 #include <list>
 #include <string>
@@ -15,32 +20,39 @@
 #include <mutex>
 #include <condition_variable>
 
+#include "audio_codec.h"
 
 class WakeWordDetect {
 public:
     WakeWordDetect();
     ~WakeWordDetect();
 
-    void Initialize(int channels, bool reference);
+    void Initialize(AudioCodec* codec);
     void Feed(const std::vector<int16_t>& data);
     void OnWakeWordDetected(std::function<void(const std::string& wake_word)> callback);
     void StartDetection();
     void StopDetection();
     bool IsDetectionRunning();
+    size_t GetFeedSize();
     void EncodeWakeWordData();
     bool GetWakeWordOpus(std::vector<uint8_t>& opus);
     const std::string& GetLastDetectedWakeWord() const { return last_detected_wake_word_; }
 
 private:
+    TaskHandle_t audio_detection_task_ = nullptr;
+#if CONFIG_USE_WAKENET_DIRECT_IF
+    esp_wn_iface_t * afe_iface_ = nullptr;
+    model_iface_data_t * afe_data_ = nullptr;
+    int16_t * data_to_det_ = nullptr;
+#else
     esp_afe_sr_iface_t* afe_iface_ = nullptr;
     esp_afe_sr_data_t* afe_data_ = nullptr;
+#endif    
     char* wakenet_model_ = NULL;
     std::vector<std::string> wake_words_;
-    std::vector<int16_t> input_buffer_;
     EventGroupHandle_t event_group_;
     std::function<void(const std::string& wake_word)> wake_word_detected_callback_;
-    int channels_;
-    bool reference_;
+    AudioCodec* codec_ = nullptr;
     std::string last_detected_wake_word_;
 
     TaskHandle_t wake_word_encode_task_ = nullptr;
